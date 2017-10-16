@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.1"
+    buildToolsVersion '26.0.2'
     defaultConfig {
         applicationId "com.central.ble.speach_2_text_iot_ble"
         minSdkVersion 24
@@ -26,4 +26,11 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.1'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     compileOnly 'com.google.android.things:androidthings:+'
+    compile 'com.google.android.things.contrib:driver-button:0.3'
+    provided 'com.google.android.things:androidthings:0.4-devpreview'
+    //compile project(':aars')
+    //compile project(':models')
+    //compile 'edu.cmu.pocketsphinx:pocketsphinx-android:5prealpha-release@aar'
+    compile(name:'pocketsphinx-android-5prealpha-release', ext:'aar')
+    compile project(':cmusphinx')
 }
