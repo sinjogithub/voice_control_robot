@@ -24,6 +24,8 @@ android {
 
 }
 
+ant.importBuild 'assets.xml'
+
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 

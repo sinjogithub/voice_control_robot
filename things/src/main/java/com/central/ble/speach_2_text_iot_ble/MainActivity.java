@@ -21,7 +21,9 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private ButtonInputDriver buttonInputDriver;
-    private static final int REQ_SPEECH_RESULT = 1;
+
+    private TtsSpeaker ttsSpeaker;
+    private PocketSphinx pocketSphinx;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,38 +41,40 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
         }catch (IOException e){
             Log.i(TAG, "Error configuring button", e);
         }
+
+        ttsSpeaker = new TtsSpeaker(this, this);
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event){
         if(keyCode == KeyEvent.KEYCODE_SPACE){
             Log.i(TAG, "Button pressed");
-            Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-           // i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Tell me, I am Listening!");
-
-            try{
-                startActivityForResult(i, REQ_SPEECH_RESULT);
-            }catch (Exception e){
-                Toast.makeText(getApplicationContext(), "Speach to text not supported !!", Toast.LENGTH_SHORT).show();
-            }
+            ttsSpeaker.say("Your turn");
+            pocketSphinx.startListeningToAction();
         }
 
         return super.onKeyDown(keyCode, event);
     }
 
-    protected void onActivityResult(int requestCode, int resultCode, Intent data){
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if(requestCode == REQ_SPEECH_RESULT) {
-            ArrayList results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            String command = (String) results.get(0);
-            Log.d(TAG, "current command [" + command + "]");
-            //This command we will snd to st nucleo board over ble.
-        }
+    @Override
+    public void onSpeechRecognizerReady() {
+        ttsSpeaker.say("Start controlling robot");
     }
 
+    @Override
+    public void onActivationPhraseDetected() {
+        Log.i(TAG, "Activation phrase detected");
+    }
+
+    @Override
+    public void onTtsInitialized() {
+        pocketSphinx = new PocketSphinx(this, this);
+    }
+
+    @Override
+    public void onTtsSpoken() {
+        Log.i(TAG, "on tts spoken");
+    }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event){
@@ -79,6 +83,31 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
         }
 
         return super.onKeyUp(keyCode, event);
+    }
+
+    @Override
+    public void onTextRecognized(String recognizedText) {
+        String input = recognizedText == null ? "" : recognizedText;
+        String answer;
+        if(input.contains("left")){
+            answer = "Turn left";
+        }else if(input.contains("right")){
+            answer = "Turn right";
+        }else if(input.contains("forward")){
+            answer = "move forward";
+
+        }else if(input.contains("reverse")){
+            answer = "move backward";
+        }else{
+            answer = "unknown command";
+        }
+
+        ttsSpeaker.say(answer);
+    }
+
+    @Override
+    public void onTimeout() {
+        ttsSpeaker.say("only ten seconds.please press button again");
     }
 
     @Override
@@ -95,6 +124,9 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
                 buttonInputDriver = null;
             }
         }
+
+        ttsSpeaker.onDestroy();
+        pocketSphinx.onDestroy();
     }
 
 }
