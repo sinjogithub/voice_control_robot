@@ -4,8 +4,10 @@
 
     <uses-permission android:name="com.google.android.things.permission.MANAGE_INPUT_DRIVERS" />
     <uses-permission android:name="com.google.android.things.permission.MANAGE_AUDIO_DRIVERS" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 
     <application>
         <uses-library android:name="com.google.android.things" />
@@ -23,6 +25,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".Ble_Client_Service"
+            android:enabled="true"
+            android:exported="true"></service>
     </application>
 
 </manifest>

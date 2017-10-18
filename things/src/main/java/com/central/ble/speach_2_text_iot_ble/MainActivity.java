@@ -1,8 +1,15 @@
 package com.central.ble.speach_2_text_iot_ble;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.speech.RecognizerIntent;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -26,6 +33,63 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     private PocketSphinx pocketSphinx;
     private boolean isSphinxInitialized = false;
 
+
+    private Ble_Client_Service ble_client_service;
+    private String mDeviceName;
+    private String mDeviceAddress;
+    private boolean mConnected = false;
+    private BluetoothGattCharacteristic mNotifyCharacteristic;
+
+    // Code to manage Service lifecycle.
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder service) {
+            ble_client_service = ((Ble_Client_Service.LocalBinder) service).getService();
+            if (!ble_client_service.initialize()) {
+                Log.e(TAG, "Unable to initialize Bluetooth");
+                finish();
+            }
+            // Automatically connects to the device upon successful start-up initialization.
+            ble_client_service.connect(mDeviceAddress);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            ble_client_service = null;
+        }
+    };
+
+    // Handles various events fired by the Service.
+    // ACTION_GATT_CONNECTED: connected to a GATT server.
+    // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
+    // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
+    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
+    //                        or notification operations.
+    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            if (ble_client_service.ACTION_GATT_CONNECTED.equals(action)) {
+                mConnected = true;
+                Log.d(TAG, "ble connected");
+               // updateConnectionState(R.string.connected);
+               // invalidateOptionsMenu();
+            } else if (ble_client_service.ACTION_GATT_DISCONNECTED.equals(action)) {
+                mConnected = false;
+                Log.d(TAG, "ble disconnected");
+                //updateConnectionState(R.string.disconnected);
+                //invalidateOptionsMenu();
+               // clearUI();
+            } else if (ble_client_service.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+                // Show all the supported services and characteristics on the user interface.
+               // displayGattServices(mBluetoothLeService.getSupportedGattServices());
+            } else if (ble_client_service.ACTION_DATA_AVAILABLE.equals(action)) {
+               // displayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
@@ -42,6 +106,9 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
         }catch (IOException e){
             Log.i(TAG, "Error configuring button", e);
         }
+
+        Intent gattServiceIntent = new Intent(this, Ble_Client_Service.class);
+        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
 
         ttsSpeaker = new TtsSpeaker(this, this);
     }
@@ -119,6 +186,32 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+        if (ble_client_service != null) {
+            final boolean result = ble_client_service.connect(mDeviceAddress);
+            Log.d(TAG, "Connect request result=" + result);
+        }
+    }
+
+    private IntentFilter makeGattUpdateIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Ble_Client_Service.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(Ble_Client_Service.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(Ble_Client_Service.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(Ble_Client_Service.ACTION_DATA_AVAILABLE);
+        return intentFilter;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d(TAG, "onPause");
+        unregisterReceiver(mGattUpdateReceiver);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
 
@@ -132,6 +225,8 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
                 buttonInputDriver = null;
             }
         }
+        unbindService(mServiceConnection);
+        ble_client_service = null;
 
         ttsSpeaker.onDestroy();
         pocketSphinx.onDestroy();
