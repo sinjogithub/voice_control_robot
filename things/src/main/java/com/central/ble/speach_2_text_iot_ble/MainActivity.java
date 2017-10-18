@@ -24,6 +24,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     private TtsSpeaker ttsSpeaker;
     private PocketSphinx pocketSphinx;
+    private boolean isSphinxInitialized = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,8 +50,13 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     public boolean onKeyDown(int keyCode, KeyEvent event){
         if(keyCode == KeyEvent.KEYCODE_SPACE){
             Log.i(TAG, "Button pressed");
-            ttsSpeaker.say("Your turn");
-            pocketSphinx.startListeningToAction();
+            if(isSphinxInitialized){
+                ttsSpeaker.say("Your turn");
+                pocketSphinx.startListeningToAction();
+            }else{
+                ttsSpeaker.say("speach recogniser not ready");
+            }
+
         }
 
         return super.onKeyDown(keyCode, event);
@@ -58,6 +64,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     @Override
     public void onSpeechRecognizerReady() {
+        isSphinxInitialized = true;
         ttsSpeaker.say("Start controlling robot");
     }
 
@@ -89,6 +96,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     public void onTextRecognized(String recognizedText) {
         String input = recognizedText == null ? "" : recognizedText;
         String answer;
+        Log.d(TAG, "command is " + input);
         if(input.contains("left")){
             answer = "Turn left";
         }else if(input.contains("right")){

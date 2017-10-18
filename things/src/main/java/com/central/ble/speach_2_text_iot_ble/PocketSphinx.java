@@ -75,7 +75,8 @@ public class PocketSphinx implements RecognitionListener {
                 .setDictionary ( new File ( assetsDir, "cmudict-en-us.dict" ) )
                 .getRecognizer ( );
         recognizer.addListener ( this );
-        recognizer.addGrammarSearch ( ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
+        //recognizer.addGrammarSearch ( ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
+        recognizer.addKeywordSearch (  ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
     }
 
     @Override
@@ -85,32 +86,43 @@ public class PocketSphinx implements RecognitionListener {
 
     @Override
     public void onEndOfSpeech() {
+        recognizer.stop();
         Log.d(TAG, "onEndOfSpeech");
     }
 
     @Override
     public void onPartialResult(Hypothesis hypothesis) {
-
+        Log.d(TAG, "onPartialResult");
     }
 
     @Override
     public void onResult(Hypothesis hypothesis) {
+        if(hypothesis == null){
+            return;
+        }
 
+        String text = hypothesis.getHypstr ();
+
+        Log.i(TAG, "On result : " + text);
+
+        listener.onTextRecognized ( text );
     }
 
     @Override
     public void onError(Exception e) {
-
+        Log.d(TAG, "onError");
     }
 
     @Override
     public void onTimeout() {
-
+        Log.d(TAG, "onTimeout");
+        recognizer.stop ();
+        listener.onTimeout ();
     }
 
     public void startListeningToAction() {
         Log.i(TAG, "Start listening for some actions with a 10secs timeout");
-        recognizer.startListening(ACTION_SEARCH, 10000);
+        recognizer.startListening(ACTION_SEARCH, 2000);
     }
 
     public void onDestroy() {
