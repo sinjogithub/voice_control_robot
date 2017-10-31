@@ -19,6 +19,8 @@ import edu.cmu.pocketsphinx.SpeechRecognizerSetup;
 
 public class PocketSphinx implements RecognitionListener {
 
+    private static final String ACTIVATION_KEYPHRASE = "control";
+
     public interface Listener {
         void onSpeechRecognizerReady();
 
@@ -30,6 +32,7 @@ public class PocketSphinx implements RecognitionListener {
     }
 
     private static final String TAG = PocketSphinx.class.getSimpleName();
+    private static final String WAKEUP_SEARCH = "wakeup";
     private static final String ACTION_SEARCH = "action";
     private final Listener listener;
     private SpeechRecognizer recognizer;
@@ -76,7 +79,9 @@ public class PocketSphinx implements RecognitionListener {
                 .getRecognizer ( );
         recognizer.addListener ( this );
         //recognizer.addGrammarSearch ( ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
-        recognizer.addKeywordSearch (  ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
+        //recognizer.addKeywordSearch (  ACTION_SEARCH, new File(assetsDir, "en-us.lm.bin") );
+        recognizer.addKeyphraseSearch(WAKEUP_SEARCH, ACTIVATION_KEYPHRASE);
+        recognizer.addNgramSearch(ACTION_SEARCH, new File(assetsDir, "voice_cmds.lm.bin"));
     }
 
     @Override
@@ -86,13 +91,27 @@ public class PocketSphinx implements RecognitionListener {
 
     @Override
     public void onEndOfSpeech() {
-        recognizer.stop();
         Log.d(TAG, "onEndOfSpeech");
+        String text = recognizer.getSearchName().toString();
+        Log.d(TAG, "string " + text);
+        if(!recognizer.getSearchName().equals(WAKEUP_SEARCH)){
+            Log.i(TAG, "End of speech, stop recognizer");
+            recognizer.stop();
+        }
     }
 
     @Override
     public void onPartialResult(Hypothesis hypothesis) {
-        Log.d(TAG, "onPartialResult");
+        if(hypothesis == null){
+            return;
+        }
+        String text = hypothesis.getHypstr();
+        if(text.equals(ACTIVATION_KEYPHRASE)){
+            Log.i(TAG, "Activation key phrase in partial result");
+            recognizer.stop();
+        }else{
+            Log.d(TAG, "onPartialResult : " + text);
+        }
     }
 
     @Override
@@ -105,7 +124,16 @@ public class PocketSphinx implements RecognitionListener {
 
         Log.i(TAG, "On result : " + text);
 
-        listener.onTextRecognized ( text );
+        if(ACTIVATION_KEYPHRASE.equals(text)){
+            listener.onActivationPhraseDetected();
+        }else{
+            listener.onTextRecognized ( text );
+        }
+
+    }
+
+    public void clearRecognizer(){
+        recognizer.cancel();
     }
 
     @Override
@@ -118,6 +146,11 @@ public class PocketSphinx implements RecognitionListener {
         Log.d(TAG, "onTimeout");
         recognizer.stop ();
         listener.onTimeout ();
+    }
+
+    public void startListeningToActivationPhrase(){
+        Log.i(TAG, "Start listening to \"control motor\" key phrase");
+        recognizer.startListening(WAKEUP_SEARCH);
     }
 
     public void startListeningToAction() {

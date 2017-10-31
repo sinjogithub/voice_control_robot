@@ -26,8 +26,17 @@ import java.util.Locale;
 
 public class MainActivity extends Activity implements TtsSpeaker.Listener, PocketSphinx.Listener{
 
+    private enum Control_State {
+        INITIALIZING,
+        LISTENING_TO_KEYPHRASE,
+        START_CONTROL_MOTOR,
+        LISTEN_CONTROL_MOTOR_ACTION,
+        CONFIRM_CONTROL_MOTOR_ACTION,
+        CONTROL_MOTOR_LISTEN_TIMEOUT
+    }
     private static final String TAG = MainActivity.class.getSimpleName();
     private ButtonInputDriver buttonInputDriver;
+    private Control_State control_state;
 
     private TtsSpeaker ttsSpeaker;
     private PocketSphinx pocketSphinx;
@@ -119,6 +128,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
             Log.i(TAG, "Button pressed");
             if(isSphinxInitialized){
                 ttsSpeaker.say("Your turn");
+                control_state = Control_State.LISTEN_CONTROL_MOTOR_ACTION;
                 pocketSphinx.startListeningToAction();
             }else{
                 ttsSpeaker.say("speach recogniser not ready");
@@ -131,13 +141,16 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     @Override
     public void onSpeechRecognizerReady() {
+        control_state = Control_State.INITIALIZING;
         isSphinxInitialized = true;
         ttsSpeaker.say("Start controlling robot");
     }
 
     @Override
     public void onActivationPhraseDetected() {
+        control_state = Control_State.START_CONTROL_MOTOR;
         Log.i(TAG, "Activation phrase detected");
+        ttsSpeaker.say("Yup");
     }
 
     @Override
@@ -148,6 +161,27 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     @Override
     public void onTtsSpoken() {
         Log.i(TAG, "on tts spoken");
+        switch (control_state){
+            case INITIALIZING:
+            case CONFIRM_CONTROL_MOTOR_ACTION:
+            case CONTROL_MOTOR_LISTEN_TIMEOUT:
+                Log.d(TAG, "Listening for key phrase");
+                control_state = Control_State.LISTENING_TO_KEYPHRASE;
+                pocketSphinx.clearRecognizer();
+                pocketSphinx.startListeningToActivationPhrase();
+                break;
+
+            case START_CONTROL_MOTOR:
+                Log.d(TAG, "Listening for action");
+                control_state = Control_State.LISTEN_CONTROL_MOTOR_ACTION;
+                pocketSphinx.clearRecognizer();
+                pocketSphinx.startListeningToAction();
+                break;
+
+            default:
+                Log.d(TAG, "wrong state : " + control_state);
+                break;
+        }
     }
 
     @Override
@@ -161,6 +195,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     @Override
     public void onTextRecognized(String recognizedText) {
+        control_state = Control_State.CONFIRM_CONTROL_MOTOR_ACTION;
         String input = recognizedText == null ? "" : recognizedText;
         String answer;
         Log.d(TAG, "command is " + input);
@@ -182,7 +217,8 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     @Override
     public void onTimeout() {
-        ttsSpeaker.say("only ten seconds.please press button again");
+        control_state = Control_State.CONTROL_MOTOR_LISTEN_TIMEOUT;
+        ttsSpeaker.say("Timeout please press button again or say control motor");
     }
 
     @Override
