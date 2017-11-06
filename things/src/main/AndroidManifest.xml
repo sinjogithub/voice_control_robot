@@ -26,10 +26,7 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".Ble_Client_Service"
-            android:enabled="true"
-            android:exported="true"></service>
+        <service android:name=".Ble_Client_Service" android:enabled="true"/>
     </application>
 
 </manifest>

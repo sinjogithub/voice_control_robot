@@ -30,20 +30,18 @@ public class Ble_Client_Service extends Service {
     private static final int STATE_CONNECTED = 2;
 
     public final static String ACTION_GATT_CONNECTED =
-            "android-er.ACTION_GATT_CONNECTED";
+            "com.central.ble.speach_2_text_iot_ble.ACTION_GATT_CONNECTED";
     public final static String ACTION_GATT_DISCONNECTED =
-            "android-er.ACTION_GATT_DISCONNECTED";
+            "com.central.ble.speach_2_text_iot_ble.ACTION_GATT_DISCONNECTED";
     public final static String ACTION_GATT_SERVICES_DISCOVERED =
-            "android-er.ACTION_GATT_SERVICES_DISCOVERED";
+            "com.central.ble.speach_2_text_iot_ble.ACTION_GATT_SERVICES_DISCOVERED";
     public final static String ACTION_DATA_AVAILABLE =
-            "android-er.ACTION_DATA_AVAILABLE";
+            "com.central.ble.speach_2_text_iot_ble.ACTION_DATA_AVAILABLE";
     public final static String EXTRA_DATA =
-            "android-er.EXTRA_DATA";
+            "com.central.ble.speach_2_text_iot_ble.EXTRA_DATA";
 
-    public static String String_Motor_Service =
-            "0000A000-0000-1000-8000-00805F9B34FB";
-    public final static UUID UUID_Motor_Service =
-            UUID.fromString(String_Motor_Service);
+
+    public final static UUID UUID_MOTOR_SERVICE = UUID.fromString(Ble_Motor_GattAttributes.MOTOR_CONTROL_SERVICE);
 
     public Ble_Client_Service() {
     }
