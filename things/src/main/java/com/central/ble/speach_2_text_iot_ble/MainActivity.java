@@ -2,16 +2,25 @@ package com.central.ble.speach_2_text_iot_ble;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.ParcelUuid;
 import android.speech.RecognizerIntent;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -24,9 +33,12 @@ import com.google.android.things.pio.PeripheralManagerService;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends Activity implements TtsSpeaker.Listener, PocketSphinx.Listener{
+
+    private static final long SCAN_PERIOD = 10000;
 
     private enum Control_State {
         INITIALIZING,
@@ -52,6 +64,7 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     private BluetoothGattCharacteristic mNotifyCharacteristic;
 
     private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothLeScanner mBluetoothLeScanner;
     private boolean mScanning;
     private Handler mHandler;
 
@@ -66,7 +79,8 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
                 finish();
             }
             // Automatically connects to the device upon successful start-up initialization.
-            ble_client_service.connect(mDeviceAddress);
+            //ble_client_service.connect(mDeviceAddress);
+
         }
 
         @Override
@@ -88,11 +102,13 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
             if (ble_client_service.ACTION_GATT_CONNECTED.equals(action)) {
                 mBLEConnected = true;
                 Log.d(TAG, "ble connected");
+                ttsSpeaker.say("connected to blue tooth low energy server");
                // updateConnectionState(R.string.connected);
                // invalidateOptionsMenu();
             } else if (ble_client_service.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mBLEConnected = false;
                 Log.d(TAG, "ble disconnected");
+                ttsSpeaker.say("disconnected from blue tooth low energy server");
                 //updateConnectionState(R.string.disconnected);
                 //invalidateOptionsMenu();
                // clearUI();
@@ -111,6 +127,24 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
         super.onCreate(savedInstanceState);
         Log.i(TAG, "starting voice listener activity");
 
+        mHandler = new Handler();
+
+        if(!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)){
+            Log.d(TAG, "Bluetoooth LE not supported");
+            finish();
+        }
+
+        final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBluetoothAdapter = bluetoothManager.getAdapter();
+
+        if(mBluetoothAdapter == null){
+            Log.d(TAG, "Error in getting Bluetooth adapter");
+            finish();
+        }
+
+        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+
+
         PeripheralManagerService pioService = new PeripheralManagerService();
 
         try{
@@ -126,6 +160,9 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
         bindService(gattServiceIntent, mBLEServiceConnection, BIND_AUTO_CREATE);
 
         ttsSpeaker = new TtsSpeaker(this, this);
+
+        scanLeDevice(true);
+
     }
 
     @Override
@@ -151,11 +188,53 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
 
     private void scanLeDevice(final boolean enable) {
         if(enable){
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    Log.d(TAG, "Stopping the scan");
+                    mScanning = false;
+                    mBluetoothLeScanner.stopScan(scanCallback);
+                }
+            }, SCAN_PERIOD);
+
+            ScanFilter scanFilter =
+                    new ScanFilter.Builder()
+                            .setServiceUuid(ParcelUuid.fromString(Ble_Motor_GattAttributes.MOTOR_CONTROL_SERVICE))
+                            .build();
+
+            List<ScanFilter> scanFilters = new ArrayList<ScanFilter>();
+            scanFilters.add(scanFilter);
+
+            ScanSettings scanSettings = new ScanSettings.Builder().build();
+
+            mBluetoothLeScanner.startScan(scanFilters, scanSettings, scanCallback);
+
+            mScanning = true;
+
+
 
         }else{
-
+            Log.d(TAG, "Stopping the scan : 2");
+            mScanning = false;
+            mBluetoothLeScanner.stopScan(scanCallback);
         }
     }
+
+    private ScanCallback scanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            super.onScanResult(callbackType, result);
+            BluetoothDevice bluetoothDevice = result.getDevice();
+            mDeviceAddress = bluetoothDevice.getAddress();
+            ble_client_service.connect(mDeviceAddress);
+        }
+
+        @Override
+        public void onScanFailed(int errorCode){
+            super.onScanFailed(errorCode);
+            Log.e(TAG, "Scan failed : " + errorCode);
+        }
+    };
 
     @Override
     public void onSpeechRecognizerReady() {
@@ -168,6 +247,9 @@ public class MainActivity extends Activity implements TtsSpeaker.Listener, Pocke
     public void onActivationPhraseDetected() {
         control_state = Control_State.START_CONTROL_MOTOR;
         Log.i(TAG, "Activation phrase detected");
+        if(!mBLEConnected){
+            scanLeDevice(true);
+        }
         ttsSpeaker.say("Yup");
     }
 
